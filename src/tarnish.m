@@ -1,21 +1,34 @@
-#import "include/tarnish.h"
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
+#import "include/tarnish.h"
 
-extern void install_frame_scheduler(void);
+void tlog(NSString *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    NSString *msg = [[NSString alloc] initWithFormat:fmt arguments:args];
+    va_end(args);
+    
+    NSString *line = [NSString stringWithFormat:@"[Tarnish] %@\n", msg];
+    NSFileHandle *fh = [NSFileHandle fileHandleForWritingAtPath:@"/tmp/tarnish.log"];
+    [fh seekToEndOfFile];
+    [fh writeData:[line dataUsingEncoding:NSUTF8StringEncoding]];
+}
 
 __attribute__((constructor))
 static void tarnish_init(void) {
-    NSLog(@"[Tarnish] Loading into %@",
-          [[NSProcessInfo processInfo] processName]);
-    
-    // Force Metal to initialize so the driver classes are registered
-    // before we try to swizzle them
+    // Create log file if it doesn't exist
+    [[NSFileManager defaultManager] createFileAtPath:@"/tmp/tarnish.log"
+                                            contents:nil
+                                          attributes:nil];
+
+    tlog(@"Loading into %@", [[NSProcessInfo processInfo] processName]);
+
     id<MTLDevice> dev = MTLCreateSystemDefaultDevice();
     if (!dev) {
-        NSLog(@"[Tarnish] ERROR: No Metal device found");
+        tlog(@"ERROR: No Metal device found");
         return;
     }
-    
+
+    tlog(@"Metal device: %@", dev.name);
     install_frame_scheduler();
 }
