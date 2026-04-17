@@ -2,6 +2,7 @@
 #import <Metal/Metal.h>
 #import <objc/runtime.h>
 #import <dispatch/dispatch.h>
+#import <time.h>
 
 #define GPU_TIMEOUT_NS 8000000ULL  // 8ms
 
@@ -13,12 +14,35 @@ static void tarnish_waitUntilCompleted(id self, SEL _cmd) {
     id<MTLCommandBuffer> buf = (id<MTLCommandBuffer>)self;
 
     MTLCommandBufferStatus status = buf.status;
+
+    // Already done, return immediately
     if (status == MTLCommandBufferStatusCompleted ||
         status == MTLCommandBufferStatusError ||
         status == MTLCommandBufferStatusNotEnqueued) {
         return;
     }
 
+    // Already committed — can't add a completion handler at this point
+    // Metal will assert and crash if we try
+    // Poll with a timeout instead
+    if (status == MTLCommandBufferStatusCommitted ||
+        status == MTLCommandBufferStatusScheduled) {
+        uint64_t deadline = clock_gettime_nsec_np(CLOCK_MONOTONIC) + GPU_TIMEOUT_NS;
+        while (true) {
+            MTLCommandBufferStatus s = buf.status;
+            if (s == MTLCommandBufferStatusCompleted ||
+                s == MTLCommandBufferStatusError) {
+                return;
+            }
+            if (clock_gettime_nsec_np(CLOCK_MONOTONIC) > deadline) {
+                tlog(@"GPU timeout polling committed buffer — continuing");
+                return;
+            }
+            usleep(100); // poll every 0.1ms
+        }
+    }
+
+    // Not yet committed — safe to add completion handler
     dispatch_semaphore_t sem = dispatch_semaphore_create(0);
 
     [buf addCompletedHandler:^(id<MTLCommandBuffer> b) {
