@@ -1,0 +1,27 @@
+# Build output
+tarnish.dylib
+tarnish.dylib.dSYM/
+
+# Log files
+/tmp/tarnish.log
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+*.pbxproj
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Temporary test binaries
+/tmp/find_wait
+/tmp/find_wait.m
+
+# Editor
+.vscode/
+*.swp
+*.swo
+*~
